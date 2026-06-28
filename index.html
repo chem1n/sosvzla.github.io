@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SOS VZLA - Mapa humanitario</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIINfQes6EJQOVyWfUK7rsiwE8ZrQnLxkP4="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Coordinacion humanitaria</p>
+        <h1>SOS VZLA - Mapa de reportes</h1>
+      </div>
+      <div class="topbar-actions">
+        <button id="refreshButton" class="icon-button" title="Actualizar reportes" type="button">
+          <span aria-hidden="true">↻</span>
+          <span>Actualizar</span>
+        </button>
+        <button id="fitButton" class="icon-button" title="Ver todos los reportes" type="button">
+          <span aria-hidden="true">⌖</span>
+          <span>Ver todo</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="map-shell" aria-label="Mapa de reportes">
+        <div id="map"></div>
+        <div id="mapHint" class="map-hint">Haz clic en el mapa para elegir coordenadas.</div>
+      </section>
+
+      <aside class="sidebar" aria-label="Panel de reportes">
+        <section class="notice">
+          <strong>Uso responsable:</strong> verifica cada dato antes de mover equipos. Evita publicar nombres,
+          telefonos, documentos o informacion que ponga en riesgo a victimas, ninos o adultos mayores.
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Filtros</h2>
+            <span id="counter" class="counter">0 reportes</span>
+          </div>
+          <div class="filters">
+            <label>
+              Buscar
+              <input id="searchInput" type="search" placeholder="Ciudad, zona, descripcion" />
+            </label>
+            <label>
+              Categoria
+              <select id="categoryFilter"></select>
+            </label>
+            <label>
+              Estado
+              <select id="statusFilter">
+                <option value="">Todos</option>
+                <option value="sin_verificar">Sin verificar</option>
+                <option value="verificado">Verificado</option>
+                <option value="en_atencion">En atencion</option>
+                <option value="resuelto">Resuelto</option>
+              </select>
+            </label>
+            <label>
+              Urgencia
+              <select id="urgencyFilter">
+                <option value="">Todas</option>
+                <option value="critica">Critica</option>
+                <option value="alta">Alta</option>
+                <option value="media">Media</option>
+                <option value="baja">Baja</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2 id="formTitle">Nuevo reporte</h2>
+            <button id="clearButton" class="ghost-button" type="button">Limpiar</button>
+          </div>
+
+          <form id="reportForm">
+            <input id="reportId" type="hidden" />
+
+            <label>
+              Categoria
+              <select id="categoryInput" required></select>
+            </label>
+
+            <label>
+              Titulo
+              <input id="titleInput" maxlength="140" required placeholder="Ej. Familia atrapada, Centro de acopio" />
+            </label>
+
+            <div class="grid-2">
+              <label>
+                Latitud
+                <input id="latInput" type="number" step="0.000001" min="-90" max="90" required />
+              </label>
+              <label>
+                Longitud
+                <input id="lngInput" type="number" step="0.000001" min="-180" max="180" required />
+              </label>
+            </div>
+
+            <div class="grid-3">
+              <label>
+                Urgencia
+                <select id="urgencyInput">
+                  <option value="critica">Critica</option>
+                  <option value="alta">Alta</option>
+                  <option value="media" selected>Media</option>
+                  <option value="baja">Baja</option>
+                </select>
+              </label>
+              <label>
+                Estado
+                <select id="statusInput">
+                  <option value="sin_verificar" selected>Sin verificar</option>
+                  <option value="verificado">Verificado</option>
+                  <option value="en_atencion">En atencion</option>
+                  <option value="resuelto">Resuelto</option>
+                </select>
+              </label>
+              <label>
+                Precision
+                <select id="qualityInput">
+                  <option value="exacta">Exacta</option>
+                  <option value="aproximada">Aproximada</option>
+                  <option value="por_confirmar" selected>Por confirmar</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="grid-3">
+              <label>
+                Pais
+                <input id="countryInput" maxlength="80" placeholder="Venezuela" />
+              </label>
+              <label>
+                Ciudad
+                <input id="cityInput" maxlength="80" placeholder="Caracas" />
+              </label>
+              <label>
+                Capacidad
+                <input id="capacityInput" maxlength="80" placeholder="Camas, cupos, raciones" />
+              </label>
+            </div>
+
+            <label>
+              Direccion o referencia
+              <input id="addressInput" maxlength="180" placeholder="Avenida, barrio, punto cercano" />
+            </label>
+
+            <fieldset>
+              <legend>Necesidades</legend>
+              <div id="needsInput" class="needs-grid"></div>
+            </fieldset>
+
+            <label>
+              Descripcion
+              <textarea id="descriptionInput" maxlength="1200" rows="4" placeholder="Detalle operativo breve"></textarea>
+            </label>
+
+            <label>
+              Fuente o verificacion
+              <input id="sourceInput" maxlength="180" placeholder="Vecino, brigada, ONG, enlace interno" />
+            </label>
+
+            <label>
+              Clave administrativa
+              <input id="tokenInput" type="password" autocomplete="current-password" placeholder="Solo si el servidor la exige" />
+            </label>
+
+            <div class="form-actions">
+              <button id="locateButton" class="secondary-button" type="button">Usar mi ubicacion</button>
+              <button class="primary-button" type="submit">Guardar reporte</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel report-list-panel">
+          <div class="panel-heading">
+            <h2>Reportes</h2>
+          </div>
+          <div id="reportList" class="report-list"></div>
+        </section>
+      </aside>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
