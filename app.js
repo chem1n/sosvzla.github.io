@@ -1,4 +1,3 @@
-const categoryFilter = document.querySelector("#categoryFilter");
 const categoryInput = document.querySelector("#categoryInput");
 const statusFilter = document.querySelector("#statusFilter");
 const urgencyFilter = document.querySelector("#urgencyFilter");
@@ -6,7 +5,12 @@ const searchInput = document.querySelector("#searchInput");
 const reportForm = document.querySelector("#reportForm");
 const reportList = document.querySelector("#reportList");
 const counter = document.querySelector("#counter");
+const visibleCounter = document.querySelector("#visibleCounter");
 const toast = document.querySelector("#toast");
+const categoryList = document.querySelector("#categoryList");
+const formBackdrop = document.querySelector("#formBackdrop");
+const reportDrawer = document.querySelector("#reportDrawer");
+const activeFilterLabel = document.querySelector("#activeFilterLabel");
 
 const fields = {
   id: document.querySelector("#reportId"),
@@ -62,12 +66,47 @@ const needOptions = [
   "Comunicacion",
 ];
 
+const categoryGroups = [
+  {
+    title: "Emergencia y rescate",
+    categories: ["rescate_escombros", "persona_viva", "medico"],
+  },
+  {
+    title: "Ayuda y suministros",
+    categories: ["centro_acopio", "voluntarios"],
+  },
+  {
+    title: "Refugio y proteccion",
+    categories: ["sin_techo", "albergue", "ninez", "mayores"],
+  },
+  {
+    title: "Incidencias",
+    categories: ["obstruccion", "fallecidos", "otro"],
+  },
+];
+
+const categorySymbols = {
+  rescate_escombros: "!",
+  persona_viva: "V",
+  fallecidos: "X",
+  centro_acopio: "+",
+  obstruccion: "P",
+  voluntarios: "A",
+  sin_techo: "C",
+  albergue: "R",
+  ninez: "N",
+  mayores: "M",
+  medico: "H",
+  otro: "?",
+};
+
 let map;
 let markerLayer;
 let draftMarker;
 let categories = {};
 let locations = [];
 let toastTimer;
+let selectedCategory = "";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -76,6 +115,10 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function cssVar(value) {
+  return String(value || "#ca2429").replace(/[^#a-fA-F0-9]/g, "");
 }
 
 function showToast(message) {
@@ -95,6 +138,19 @@ function formatDate(value) {
   }).format(date);
 }
 
+function mapsUrl(location) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.lat},${location.lng}`)}`;
+}
+
+function directionsUrl(location) {
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${location.lat},${location.lng}`)}`;
+}
+
+function geoUrl(location) {
+  const label = encodeURIComponent(location.title || "SOS VZLA");
+  return `geo:${location.lat},${location.lng}?q=${location.lat},${location.lng}(${label})`;
+}
+
 function getToken() {
   const current = fields.token.value.trim();
   if (current) {
@@ -111,35 +167,68 @@ function authHeaders() {
 function initMap() {
   map = L.map("map", {
     worldCopyJump: true,
-    zoomControl: true,
-  }).setView([8.2, -66.6], 5);
+    zoomControl: false,
+    preferCanvas: true,
+  }).setView([18, 0], 2);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
   }).addTo(map);
 
+  L.control.zoom({ position: "bottomright" }).addTo(map);
   L.control.scale({ imperial: false }).addTo(map);
   markerLayer = L.layerGroup().addTo(map);
 
-  map.on("click", (event) => setCoordinates(event.latlng.lat, event.latlng.lng, true));
+  map.on("click", (event) => {
+    setCoordinates(event.latlng.lat, event.latlng.lng, true);
+    openForm();
+  });
+
+  window.addEventListener("resize", () => map.invalidateSize());
+  setTimeout(() => map.invalidateSize(), 150);
 }
 
 function buildCategoryControls() {
-  categoryFilter.innerHTML = '<option value="">Todas</option>';
   categoryInput.innerHTML = "";
 
   Object.entries(categories).forEach(([key, category]) => {
-    const filterOption = document.createElement("option");
-    filterOption.value = key;
-    filterOption.textContent = category.label;
-    categoryFilter.appendChild(filterOption);
-
     const inputOption = document.createElement("option");
     inputOption.value = key;
     inputOption.textContent = category.label;
     categoryInput.appendChild(inputOption);
   });
+
+  renderCategoryButtons();
+}
+
+function renderCategoryButtons() {
+  const counts = locations.reduce((result, location) => {
+    result[location.category] = (result[location.category] || 0) + 1;
+    return result;
+  }, {});
+
+  categoryList.innerHTML = categoryGroups
+    .map((group) => {
+      const buttons = group.categories
+        .filter((key) => categories[key])
+        .map((key) => {
+          const category = categories[key];
+          const isActive = selectedCategory === key ? " active" : "";
+          return `
+            <button class="category-button${isActive}" type="button" data-category="${escapeHtml(key)}">
+              <span class="category-icon">${escapeHtml(categorySymbols[key] || "?")}</span>
+              <span class="category-name">${escapeHtml(category.label)}</span>
+              <span class="category-count">${counts[key] || 0}</span>
+            </button>
+          `;
+        })
+        .join("");
+
+      return `<div class="section-label">${escapeHtml(group.title)}</div>${buttons}`;
+    })
+    .join("");
 }
 
 function buildNeedsControls() {
@@ -165,12 +254,12 @@ async function loadLocations({ fit = false } = {}) {
   if (!response.ok) throw new Error("No se pudieron cargar los reportes.");
   const data = await response.json();
   locations = Array.isArray(data.locations) ? data.locations : [];
+  renderCategoryButtons();
   render(fit);
 }
 
 function filteredLocations() {
   const query = searchInput.value.trim().toLowerCase();
-  const category = categoryFilter.value;
   const status = statusFilter.value;
   const urgency = urgencyFilter.value;
 
@@ -190,25 +279,34 @@ function filteredLocations() {
 
     return (
       (!query || text.includes(query)) &&
-      (!category || location.category === category) &&
+      (!selectedCategory || location.category === selectedCategory) &&
       (!status || location.status === status) &&
       (!urgency || location.urgency === urgency)
     );
   });
 }
 
-function markerRadius(urgency) {
-  if (urgency === "critica") return 12;
-  if (urgency === "alta") return 10;
-  if (urgency === "baja") return 7;
-  return 8;
-}
-
 function render(fit = false) {
   const items = filteredLocations();
-  counter.textContent = `${items.length} ${items.length === 1 ? "reporte" : "reportes"}`;
+  counter.textContent = String(locations.length);
+  visibleCounter.textContent = `${items.length} ${items.length === 1 ? "visible" : "visibles"}`;
+  activeFilterLabel.textContent = selectedCategory && categories[selectedCategory] ? categories[selectedCategory].label : "Todos los reportes";
   renderMarkers(items, fit);
   renderList(items);
+}
+
+function createPinIcon(location) {
+  const category = categories[location.category] || categories.otro || { color: "#ca2429" };
+  const symbol = categorySymbols[location.category] || "?";
+  const opacity = location.status === "resuelto" ? "0.58" : "1";
+
+  return L.divIcon({
+    className: "sos-pin-icon",
+    iconSize: [34, 42],
+    iconAnchor: [17, 34],
+    popupAnchor: [0, -33],
+    html: `<div class="map-pin" style="--pin-color:${cssVar(category.color)};opacity:${opacity}"><span>${escapeHtml(symbol)}</span></div>`,
+  });
 }
 
 function renderMarkers(items, fit = false) {
@@ -216,23 +314,25 @@ function renderMarkers(items, fit = false) {
   const bounds = [];
 
   items.forEach((location) => {
-    const category = categories[location.category] || categories.otro || { color: "#475467", label: "Otro" };
-    const marker = L.circleMarker([location.lat, location.lng], {
-      radius: markerRadius(location.urgency),
-      color: "#ffffff",
-      weight: 2,
-      fillColor: category.color,
-      fillOpacity: location.status === "resuelto" ? 0.45 : 0.88,
+    const category = categories[location.category] || categories.otro || { color: "#ca2429", label: "Otro" };
+    const marker = L.marker([location.lat, location.lng], {
+      icon: createPinIcon(location),
+      title: `${location.title} - abrir ficha`,
     });
 
     marker.bindPopup(popupHtml(location, category));
     marker.on("click", () => highlightListItem(location.id));
+    marker.on("dblclick", () => window.open(mapsUrl(location), "_blank", "noopener"));
     marker.addTo(markerLayer);
     bounds.push([location.lat, location.lng]);
   });
 
   if (fit && bounds.length) {
-    map.fitBounds(bounds, { padding: [34, 34], maxZoom: 12 });
+    if (bounds.length === 1) {
+      map.setView(bounds[0], 6);
+      return;
+    }
+    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 12 });
   }
 }
 
@@ -240,14 +340,20 @@ function popupHtml(location, category) {
   const place = [location.address, location.city, location.country].filter(Boolean).join(", ");
   const needs = (location.needs || []).length ? `<p class="popup-text"><strong>Necesita:</strong> ${escapeHtml(location.needs.join(", "))}</p>` : "";
   const description = location.description ? `<p class="popup-text">${escapeHtml(location.description)}</p>` : "";
+
   return `
     <div>
       <p class="popup-title">${escapeHtml(location.title)}</p>
-      <p class="popup-text">${escapeHtml(category.label)} · ${escapeHtml(urgencyLabels[location.urgency])} · ${escapeHtml(statusLabels[location.status])}</p>
+      <p class="popup-text">${escapeHtml(category.label)} / ${escapeHtml(urgencyLabels[location.urgency])} / ${escapeHtml(statusLabels[location.status])}</p>
       ${place ? `<p class="popup-text">${escapeHtml(place)}</p>` : ""}
       ${description}
       ${needs}
-      <p class="popup-text">${escapeHtml(qualityLabels[location.location_quality] || "")} · ${escapeHtml(formatDate(location.updated_at))}</p>
+      <p class="popup-text">${escapeHtml(qualityLabels[location.location_quality] || "")} / ${escapeHtml(formatDate(location.updated_at))}</p>
+      <div class="popup-actions">
+        <a href="${mapsUrl(location)}" target="_blank" rel="noopener">Google Maps</a>
+        <a href="${directionsUrl(location)}" target="_blank" rel="noopener">Ruta</a>
+        <a href="${geoUrl(location)}">GPS</a>
+      </div>
     </div>
   `;
 }
@@ -260,7 +366,7 @@ function renderList(items) {
 
   reportList.innerHTML = items
     .map((location) => {
-      const category = categories[location.category] || categories.otro || { color: "#475467", label: "Otro" };
+      const category = categories[location.category] || categories.otro || { color: "#ca2429", label: "Otro" };
       const place = [location.city, location.country].filter(Boolean).join(", ");
       const description = location.description ? escapeHtml(location.description) : "Sin descripcion.";
       const needs = (location.needs || [])
@@ -268,20 +374,21 @@ function renderList(items) {
         .join("");
 
       return `
-        <article class="report-item" data-id="${escapeHtml(location.id)}" style="--item-color:${category.color}">
+        <article class="report-item" data-id="${escapeHtml(location.id)}" style="--item-color:${cssVar(category.color)}">
           <div class="report-title-row">
             <h3 class="report-title">${escapeHtml(location.title)}</h3>
             <span class="badge urgency-${escapeHtml(location.urgency)}">${escapeHtml(urgencyLabels[location.urgency])}</span>
           </div>
-          <p class="report-meta">${escapeHtml(category.label)} · ${escapeHtml(statusLabels[location.status])} · ${escapeHtml(place || "Sin ciudad")}</p>
+          <p class="report-meta">${escapeHtml(category.label)} / ${escapeHtml(statusLabels[location.status])} / ${escapeHtml(place || "Sin ciudad")}</p>
           <p class="report-description">${description}</p>
           <div class="badge-row">
             <span class="badge">${escapeHtml(qualityLabels[location.location_quality])}</span>
             ${needs}
           </div>
           <div class="report-actions">
-            <button class="secondary-button" type="button" data-action="view" data-id="${escapeHtml(location.id)}">Ver</button>
-            <button class="secondary-button" type="button" data-action="edit" data-id="${escapeHtml(location.id)}">Editar</button>
+            <button type="button" data-action="view" data-id="${escapeHtml(location.id)}">Mapa</button>
+            <button type="button" data-action="maps" data-id="${escapeHtml(location.id)}">Google Maps</button>
+            <button type="button" data-action="edit" data-id="${escapeHtml(location.id)}">Editar</button>
             <button class="danger-button" type="button" data-action="delete" data-id="${escapeHtml(location.id)}">Eliminar</button>
           </div>
         </article>
@@ -292,7 +399,7 @@ function renderList(items) {
 
 function highlightListItem(id) {
   document.querySelectorAll(".report-item").forEach((item) => {
-    item.style.outline = item.dataset.id === id ? "2px solid #1570ef" : "";
+    item.style.outline = item.dataset.id === id ? "2px solid #ca2429" : "";
   });
 }
 
@@ -306,7 +413,15 @@ function setCoordinates(lat, lng, moveDraft = false) {
     if (draftMarker) {
       draftMarker.setLatLng([lat, lng]);
     } else {
-      draftMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      draftMarker = L.marker([lat, lng], {
+        draggable: true,
+        icon: L.divIcon({
+          className: "draft-pin-icon",
+          iconSize: [34, 42],
+          iconAnchor: [17, 34],
+          html: '<div class="map-pin draft-marker"><span>+</span></div>',
+        }),
+      }).addTo(map);
       draftMarker.on("dragend", () => {
         const position = draftMarker.getLatLng();
         setCoordinates(position.lat, position.lng, false);
@@ -345,12 +460,23 @@ function formPayload() {
   };
 }
 
+function openForm() {
+  formBackdrop.hidden = false;
+  requestAnimationFrame(() => fields.title.focus({ preventScroll: true }));
+}
+
+function closeForm() {
+  formBackdrop.hidden = true;
+  map.invalidateSize();
+}
+
 function resetForm() {
   reportForm.reset();
   fields.id.value = "";
   fields.urgency.value = "media";
   fields.status.value = "sin_verificar";
   fields.quality.value = "por_confirmar";
+  fields.country.value = "Venezuela";
   setNeeds([]);
   document.querySelector("#formTitle").textContent = "Nuevo reporte";
   if (draftMarker) {
@@ -377,6 +503,7 @@ function fillForm(location) {
   setNeeds(location.needs || []);
   document.querySelector("#formTitle").textContent = "Editar reporte";
   setCoordinates(location.lat, location.lng, true);
+  openForm();
 }
 
 async function saveReport(event) {
@@ -401,6 +528,7 @@ async function saveReport(event) {
   }
 
   resetForm();
+  closeForm();
   await loadLocations({ fit: true });
   showToast(id ? "Reporte actualizado." : "Reporte guardado.");
 }
@@ -443,9 +571,26 @@ async function useBrowserLocation() {
   );
 }
 
+function clearFilters() {
+  selectedCategory = "";
+  searchInput.value = "";
+  statusFilter.value = "";
+  urgencyFilter.value = "";
+  renderCategoryButtons();
+  render(true);
+}
+
 function bindEvents() {
-  [categoryFilter, statusFilter, urgencyFilter, searchInput].forEach((element) => {
+  [statusFilter, urgencyFilter, searchInput].forEach((element) => {
     element.addEventListener("input", () => render(false));
+  });
+
+  categoryList.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-category]");
+    if (!button) return;
+    selectedCategory = selectedCategory === button.dataset.category ? "" : button.dataset.category;
+    renderCategoryButtons();
+    render(true);
   });
 
   reportForm.addEventListener("submit", (event) => {
@@ -459,6 +604,7 @@ function bindEvents() {
     if (!location) return;
 
     if (button.dataset.action === "view") focusLocation(location);
+    if (button.dataset.action === "maps") window.open(mapsUrl(location), "_blank", "noopener");
     if (button.dataset.action === "edit") fillForm(location);
     if (button.dataset.action === "delete") deleteReport(location.id).catch((error) => showToast(error.message));
   });
@@ -469,7 +615,30 @@ function bindEvents() {
 
   document.querySelector("#fitButton").addEventListener("click", () => render(true));
   document.querySelector("#clearButton").addEventListener("click", resetForm);
+  document.querySelector("#clearFiltersButton").addEventListener("click", clearFilters);
   document.querySelector("#locateButton").addEventListener("click", useBrowserLocation);
+  document.querySelector("#openFormButton").addEventListener("click", () => {
+    resetForm();
+    openForm();
+  });
+  document.querySelector("#floatingAddButton").addEventListener("click", () => {
+    resetForm();
+    openForm();
+  });
+  document.querySelector("#closeFormButton").addEventListener("click", closeForm);
+  formBackdrop.addEventListener("click", (event) => {
+    if (event.target === formBackdrop) closeForm();
+  });
+
+  document.querySelector("#toggleDrawerButton").addEventListener("click", (event) => {
+    reportDrawer.classList.toggle("collapsed");
+    event.currentTarget.textContent = reportDrawer.classList.contains("collapsed") ? "Mostrar" : "Ocultar";
+    setTimeout(() => map.invalidateSize(), 220);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !formBackdrop.hidden) closeForm();
+  });
 
   fields.token.value = localStorage.getItem("sosvzla-admin-token") || "";
 }
@@ -480,7 +649,8 @@ async function start() {
     buildNeedsControls();
     bindEvents();
     await loadCategories();
-    await loadLocations({ fit: true });
+    resetForm();
+    await loadLocations({ fit: false });
   } catch (error) {
     showToast(error.message);
   }

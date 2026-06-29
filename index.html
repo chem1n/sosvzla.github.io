@@ -13,186 +13,239 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Coordinacion humanitaria</p>
-        <h1>SOS VZLA - Mapa de reportes</h1>
-      </div>
-      <div class="topbar-actions">
-        <button id="refreshButton" class="icon-button" title="Actualizar reportes" type="button">
-          <span aria-hidden="true">↻</span>
+    <header class="app-header">
+      <a class="brand" href="/" aria-label="SOS VZLA">
+        <span class="brand-mark" aria-hidden="true">SOS</span>
+        <span>
+          <strong>SOS VZLA</strong>
+          <small>Mapa humanitario</small>
+        </span>
+      </a>
+
+      <nav class="top-nav" aria-label="Acciones principales">
+        <button id="refreshButton" class="nav-button" title="Actualizar reportes" type="button">
+          <span class="button-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M20 6v5h-5" />
+              <path d="M4 18v-5h5" />
+              <path d="M18.8 9A7 7 0 0 0 7 5.7L4 8.5" />
+              <path d="M5.2 15A7 7 0 0 0 17 18.3l3-2.8" />
+            </svg>
+          </span>
           <span>Actualizar</span>
         </button>
-        <button id="fitButton" class="icon-button" title="Ver todos los reportes" type="button">
-          <span aria-hidden="true">⌖</span>
+        <button id="fitButton" class="nav-button" title="Ver todos los reportes" type="button">
+          <span class="button-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 3v3" />
+              <path d="M12 18v3" />
+              <path d="M3 12h3" />
+              <path d="M18 12h3" />
+              <circle cx="12" cy="12" r="5" />
+            </svg>
+          </span>
           <span>Ver todo</span>
         </button>
-      </div>
+        <button id="openFormButton" class="primary-nav-button" title="Crear reporte" type="button">
+          <span class="button-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </span>
+          <span>Reporte</span>
+        </button>
+      </nav>
     </header>
 
-    <main class="layout">
-      <section class="map-shell" aria-label="Mapa de reportes">
-        <div id="map"></div>
-        <div id="mapHint" class="map-hint">Haz clic en el mapa para elegir coordenadas.</div>
-      </section>
+    <main class="app-frame">
+      <aside class="sidebar" aria-label="Apartados de reportes">
+        <div class="search-box">
+          <span class="search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m16.5 16.5 4 4" />
+            </svg>
+          </span>
+          <input id="searchInput" type="search" placeholder="Buscar reportes" />
+        </div>
 
-      <aside class="sidebar" aria-label="Panel de reportes">
-        <section class="notice">
-          <strong>Uso responsable:</strong> verifica cada dato antes de mover equipos. Evita publicar nombres,
-          telefonos, documentos o informacion que ponga en riesgo a victimas, ninos o adultos mayores.
+        <div class="sidebar-summary">
+          <p>Reportes activos</p>
+          <strong id="counter">0</strong>
+        </div>
+
+        <section class="sidebar-section">
+          <div class="sidebar-title-row">
+            <h2>Apartados</h2>
+            <button id="clearFiltersButton" type="button">Todos</button>
+          </div>
+          <div id="categoryList" class="category-list"></div>
         </section>
 
-        <section class="panel">
-          <div class="panel-heading">
-            <h2>Filtros</h2>
-            <span id="counter" class="counter">0 reportes</span>
+        <section class="sidebar-section compact-filters">
+          <h2>Estado</h2>
+          <select id="statusFilter">
+            <option value="">Todos</option>
+            <option value="sin_verificar">Sin verificar</option>
+            <option value="verificado">Verificado</option>
+            <option value="en_atencion">En atencion</option>
+            <option value="resuelto">Resuelto</option>
+          </select>
+
+          <h2>Urgencia</h2>
+          <select id="urgencyFilter">
+            <option value="">Todas</option>
+            <option value="critica">Critica</option>
+            <option value="alta">Alta</option>
+            <option value="media">Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </section>
+
+        <section class="sidebar-note">
+          <strong>Uso responsable</strong>
+          <p>Verifica antes de mover equipos. Evita publicar nombres, telefonos, documentos o datos sensibles.</p>
+        </section>
+      </aside>
+
+      <section class="map-panel" aria-label="Mapa mundial de reportes">
+        <div id="map"></div>
+
+        <div class="map-status">
+          <span id="activeFilterLabel">Todos los reportes</span>
+          <strong id="visibleCounter">0 visibles</strong>
+        </div>
+
+        <button id="floatingAddButton" class="floating-add" title="Crear reporte" type="button">+</button>
+
+        <div id="mapHint" class="map-hint">Haz clic en el mapa para elegir coordenadas del nuevo reporte.</div>
+
+        <section id="reportDrawer" class="report-drawer" aria-label="Lista de reportes">
+          <div class="drawer-header">
+            <div>
+              <p>Vista operativa</p>
+              <h2>Reportes</h2>
+            </div>
+            <button id="toggleDrawerButton" class="drawer-toggle" type="button">Ocultar</button>
           </div>
-          <div class="filters">
-            <label>
-              Buscar
-              <input id="searchInput" type="search" placeholder="Ciudad, zona, descripcion" />
-            </label>
-            <label>
+          <div id="reportList" class="report-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <div id="formBackdrop" class="modal-backdrop" hidden>
+      <section class="report-modal" role="dialog" aria-modal="true" aria-labelledby="formTitle">
+        <div class="modal-header">
+          <div>
+            <p>Registro humanitario</p>
+            <h2 id="formTitle">Nuevo reporte</h2>
+          </div>
+          <button id="closeFormButton" class="modal-close" type="button" aria-label="Cerrar">X</button>
+        </div>
+
+        <form id="reportForm">
+          <input id="reportId" type="hidden" />
+
+          <div class="form-grid">
+            <label class="field-wide">
               Categoria
-              <select id="categoryFilter"></select>
+              <select id="categoryInput" required></select>
             </label>
+
+            <label class="field-wide">
+              Titulo
+              <input id="titleInput" maxlength="140" required placeholder="Ej. Familia atrapada, centro de acopio" />
+            </label>
+
+            <label>
+              Latitud
+              <input id="latInput" type="number" step="0.000001" min="-90" max="90" required />
+            </label>
+
+            <label>
+              Longitud
+              <input id="lngInput" type="number" step="0.000001" min="-180" max="180" required />
+            </label>
+
+            <label>
+              Urgencia
+              <select id="urgencyInput">
+                <option value="critica">Critica</option>
+                <option value="alta">Alta</option>
+                <option value="media" selected>Media</option>
+                <option value="baja">Baja</option>
+              </select>
+            </label>
+
             <label>
               Estado
-              <select id="statusFilter">
-                <option value="">Todos</option>
-                <option value="sin_verificar">Sin verificar</option>
+              <select id="statusInput">
+                <option value="sin_verificar" selected>Sin verificar</option>
                 <option value="verificado">Verificado</option>
                 <option value="en_atencion">En atencion</option>
                 <option value="resuelto">Resuelto</option>
               </select>
             </label>
+
             <label>
-              Urgencia
-              <select id="urgencyFilter">
-                <option value="">Todas</option>
-                <option value="critica">Critica</option>
-                <option value="alta">Alta</option>
-                <option value="media">Media</option>
-                <option value="baja">Baja</option>
+              Precision
+              <select id="qualityInput">
+                <option value="exacta">Exacta</option>
+                <option value="aproximada">Aproximada</option>
+                <option value="por_confirmar" selected>Por confirmar</option>
               </select>
             </label>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-heading">
-            <h2 id="formTitle">Nuevo reporte</h2>
-            <button id="clearButton" class="ghost-button" type="button">Limpiar</button>
-          </div>
-
-          <form id="reportForm">
-            <input id="reportId" type="hidden" />
 
             <label>
-              Categoria
-              <select id="categoryInput" required></select>
+              Pais
+              <input id="countryInput" maxlength="80" placeholder="Venezuela" />
             </label>
 
             <label>
-              Titulo
-              <input id="titleInput" maxlength="140" required placeholder="Ej. Familia atrapada, Centro de acopio" />
+              Ciudad
+              <input id="cityInput" maxlength="80" placeholder="Caracas" />
             </label>
 
-            <div class="grid-2">
-              <label>
-                Latitud
-                <input id="latInput" type="number" step="0.000001" min="-90" max="90" required />
-              </label>
-              <label>
-                Longitud
-                <input id="lngInput" type="number" step="0.000001" min="-180" max="180" required />
-              </label>
-            </div>
-
-            <div class="grid-3">
-              <label>
-                Urgencia
-                <select id="urgencyInput">
-                  <option value="critica">Critica</option>
-                  <option value="alta">Alta</option>
-                  <option value="media" selected>Media</option>
-                  <option value="baja">Baja</option>
-                </select>
-              </label>
-              <label>
-                Estado
-                <select id="statusInput">
-                  <option value="sin_verificar" selected>Sin verificar</option>
-                  <option value="verificado">Verificado</option>
-                  <option value="en_atencion">En atencion</option>
-                  <option value="resuelto">Resuelto</option>
-                </select>
-              </label>
-              <label>
-                Precision
-                <select id="qualityInput">
-                  <option value="exacta">Exacta</option>
-                  <option value="aproximada">Aproximada</option>
-                  <option value="por_confirmar" selected>Por confirmar</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="grid-3">
-              <label>
-                Pais
-                <input id="countryInput" maxlength="80" placeholder="Venezuela" />
-              </label>
-              <label>
-                Ciudad
-                <input id="cityInput" maxlength="80" placeholder="Caracas" />
-              </label>
-              <label>
-                Capacidad
-                <input id="capacityInput" maxlength="80" placeholder="Camas, cupos, raciones" />
-              </label>
-            </div>
-
             <label>
+              Capacidad
+              <input id="capacityInput" maxlength="80" placeholder="Camas, cupos, raciones" />
+            </label>
+
+            <label class="field-wide">
               Direccion o referencia
               <input id="addressInput" maxlength="180" placeholder="Avenida, barrio, punto cercano" />
             </label>
 
-            <fieldset>
+            <fieldset class="field-wide">
               <legend>Necesidades</legend>
               <div id="needsInput" class="needs-grid"></div>
             </fieldset>
 
-            <label>
+            <label class="field-wide">
               Descripcion
               <textarea id="descriptionInput" maxlength="1200" rows="4" placeholder="Detalle operativo breve"></textarea>
             </label>
 
-            <label>
+            <label class="field-wide">
               Fuente o verificacion
               <input id="sourceInput" maxlength="180" placeholder="Vecino, brigada, ONG, enlace interno" />
             </label>
 
-            <label>
+            <label class="field-wide">
               Clave administrativa
               <input id="tokenInput" type="password" autocomplete="current-password" placeholder="Solo si el servidor la exige" />
             </label>
-
-            <div class="form-actions">
-              <button id="locateButton" class="secondary-button" type="button">Usar mi ubicacion</button>
-              <button class="primary-button" type="submit">Guardar reporte</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="panel report-list-panel">
-          <div class="panel-heading">
-            <h2>Reportes</h2>
           </div>
-          <div id="reportList" class="report-list"></div>
-        </section>
-      </aside>
-    </main>
+
+          <div class="form-actions">
+            <button id="clearButton" class="ghost-button" type="button">Limpiar</button>
+            <button id="locateButton" class="secondary-button" type="button">Usar mi ubicacion</button>
+            <button class="primary-button" type="submit">Guardar reporte</button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
